@@ -2,6 +2,8 @@ use std::{error::Error, io::{self, Write}};
 
 use serde::Deserialize;
 use reqwest;
+use charming::{component::Axis, element::{AxisType, Tooltip, Trigger}, series::Line, theme::Theme, Chart, HtmlRenderer};
+
 
 #[derive(Deserialize)]
 struct WeatherData {
@@ -26,6 +28,7 @@ struct CurrentData {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    //Remember to modify latitude and longitude!
     let latitude = 0;
     let longitude = 0;
     let current_weather_params = "temperature_2m,pressure_msl,surface_pressure";
@@ -46,6 +49,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     let text = response.text()?;
 
     let weather_data: WeatherData = serde_json::from_str(&text)?;
+
+
+    let chart = Chart::new().x_axis(
+        Axis::new()
+            .type_(AxisType::Category)
+            .data(weather_data.hourly.time.clone())
+    )
+    .y_axis(Axis::new().type_(AxisType::Value).min(850).max(1100))    
+    .series(Line::new().data(weather_data.hourly.pressure_msl.clone().iter().map(|&x| format!("{:.1}", x)).collect()))
+    .series(Line::new().data(weather_data.hourly.surface_pressure.clone().iter().map(|&x| format!("{:.1}", x)).collect()))
+    .series(Line::new().data(weather_data.hourly.temperature_2m.clone().iter().map(|&x| format!("{:.1}", x)).collect())) // won't be visible on the chart
+    .tooltip(Tooltip::new().trigger(Trigger::Axis).formatter("{b}<br/>Temperature: {c2}°C <br/>Pressure MSL: {c0} hPa<br/>Surface Pressure: {c1} hPa"));
+
+    let mut renderer = HtmlRenderer::new("meteo-fetcher", 2000, 1000).theme(Theme::Dark);
+    renderer.save(&chart, "./chart.html").unwrap();
 
     println!("Past Weather Data:");
     // for every hourly weather data stored, print every sixth to minimize overall data printed out
